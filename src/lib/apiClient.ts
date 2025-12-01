@@ -181,6 +181,15 @@ export async function fetchMessages(chatId: string): Promise<ChatMessage[]> {
   }));
 }
 
-export async function sendWhatsAppMessage(to: string, message: string): Promise<void> {
-  await apiClient.post('/api/whatsapp/send', { to, message });
+export interface SendMessageResponse {
+  success: boolean;
+  message: string;
+  data: {
+    messageId: string;
+    chatId: string;
+  };
+}
+
+export async function sendWhatsAppMessage(to: string, message: string): Promise<SendMessageResponse> {
+  return await apiClient.post<SendMessageResponse>('/api/whatsapp/send', { to, message });
 }

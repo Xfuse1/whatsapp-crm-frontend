@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, MessageSquare } from 'lucide-react';
 import type { Chat } from '@/types/whatsapp';
 
 interface ChatSidebarProps {
   chats: Chat[];
   selectedChatId?: string;
   onSelectChat: (chatId: string) => void;
+  isLoading?: boolean;
 }
 
-export default function ChatSidebar({ chats, selectedChatId, onSelectChat }: ChatSidebarProps) {
+export default function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading = false }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const formatTime = (dateString: string | null) => {
@@ -41,10 +42,40 @@ export default function ChatSidebar({ chats, selectedChatId, onSelectChat }: Cha
   }, [chats, searchQuery]);
 
   return (
-    <div className="w-80 bg-gradient-to-b from-gray-50 to-white border-l border-gray-200 flex flex-col shadow-sm">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <h2 className="text-xl font-bold text-gray-900 mb-3">المحادثات</h2>
+    <div className="w-[340px] bg-white border-r border-gray-200 flex flex-col">
+      {/* Header - WhatsApp style */}
+      <div className="bg-[#f0f2f5] px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white">
+            <MessageSquare className="w-5 h-5" />
+          </div>
+        </div>
+        <h2 className="text-base font-medium text-gray-700">المحادثات</h2>
+      </div>
+      
+      {/* Search bar */}
+      <div className="px-3 py-2 bg-white border-b border-gray-100">
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ابحث أو ابدأ محادثة جديدة"
+            className="w-full pr-10 pl-10 py-2 text-sm bg-[#f0f2f5] border-0 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500 transition-all placeholder:text-gray-500"
+            dir="auto"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="مسح البحث"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
         
         {/* Search bar */}
         <div className="relative">
@@ -71,57 +102,64 @@ export default function ChatSidebar({ chats, selectedChatId, onSelectChat }: Cha
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto">
-        {chats.length === 0 ? (
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-500 border-t-transparent mx-auto mb-3"></div>
+            <p className="text-gray-500 text-sm">جاري التحميل...</p>
+          </div>
+        ) : chats.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            <div className="text-5xl mb-3">💬</div>
-            <p className="font-medium">لا توجد محادثات حتى الآن</p>
-            <p className="text-sm mt-1">ابدأ بمراسلة عميل جديد</p>
+            <div className="text-4xl mb-3 opacity-50">💬</div>
+            <p className="text-sm">لا توجد محادثات</p>
           </div>
         ) : filteredChats.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            <div className="text-5xl mb-3">🔍</div>
-            <p className="font-medium">لا توجد نتائج</p>
-            <p className="text-sm mt-1">جرب البحث بكلمات أخرى</p>
+            <div className="text-4xl mb-3 opacity-50">🔍</div>
+            <p className="text-sm">لا توجد نتائج</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div>
             {filteredChats.map((chat) => (
               <button
                 key={chat.id}
                 onClick={() => onSelectChat(chat.id)}
-                className={`w-full p-4 text-right transition-all duration-200 group relative ${
+                className={`w-full px-3 py-3 text-right transition-colors flex items-center gap-3 border-b border-gray-100 ${
                   selectedChatId === chat.id 
-                    ? 'bg-gradient-to-l from-green-50 to-green-100 border-r-4 border-green-600 shadow-sm' 
-                    : 'hover:bg-gray-50 hover:shadow-sm'
+                    ? 'bg-[#f0f2f5]' 
+                    : 'hover:bg-[#f5f6f6]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-medium ${
-                    selectedChatId === chat.id ? 'text-green-700' : 'text-gray-500'
-                  }`}>
-                    {formatTime(chat.lastMessageAt)}
-                  </span>
-                  <div className="flex items-center gap-2 flex-1 ml-3">
-                    <h3 className={`font-semibold truncate ${
-                      selectedChatId === chat.id ? 'text-gray-900' : 'text-gray-800 group-hover:text-gray-900'
-                    }`}>
-                      {chat.title || 'بدون اسم'}
-                    </h3>
-                    {/* Avatar circle */}
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${
-                      selectedChatId === chat.id ? 'bg-green-600' : 'bg-gradient-to-br from-green-500 to-green-600'
-                    }`}>
-                      {(chat.title || '?').charAt(0).toUpperCase()}
-                    </div>
+                {/* Avatar */}
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white font-semibold text-lg shrink-0 overflow-hidden">
+                  <div className="w-full h-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+                    {(chat.title || '?').charAt(0).toUpperCase()}
                   </div>
                 </div>
-                {chat.unreadCount && chat.unreadCount > 0 && (
-                  <div className="flex justify-end mt-1">
-                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-green-600 rounded-full shadow-md">
-                      {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                
+                {/* Chat info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-medium text-gray-900 truncate">
+                      {chat.title || 'بدون اسم'}
+                    </h3>
+                    <span className={`text-xs shrink-0 mr-2 ${
+                      chat.unreadCount && chat.unreadCount > 0 ? 'text-teal-600 font-medium' : 'text-gray-500'
+                    }`}>
+                      {formatTime(chat.lastMessageAt)}
                     </span>
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-500 truncate">
+                      {/* Last message preview could go here */}
+                      آخر رسالة...
+                    </p>
+                    {chat.unreadCount && chat.unreadCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-medium text-white bg-teal-500 rounded-full shrink-0 mr-2">
+                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </button>
             ))}
           </div>

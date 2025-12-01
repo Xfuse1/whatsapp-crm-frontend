@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, CheckCheck } from 'lucide-react';
+import { Check, CheckCheck, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import type { ChatMessage } from '@/types/whatsapp';
 
 interface ChatMessageListProps {
   messages: ChatMessage[];
+  onRetry?: (messageId: string) => void;
 }
 
-export default function ChatMessageList({ messages }: ChatMessageListProps) {
+export default function ChatMessageList({ messages, onRetry }: ChatMessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -40,13 +42,35 @@ export default function ChatMessageList({ messages }: ChatMessageListProps) {
     }
   };
 
+  // Render message status icon
+  const renderStatusIcon = (status: string | null | undefined) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="w-3.5 h-3.5 text-gray-400" />;
+      case 'sent':
+        return <Check className="w-4 h-4 text-gray-400" />;
+      case 'delivered':
+        return <CheckCheck className="w-4 h-4 text-gray-400" />;
+      case 'read':
+        return <CheckCheck className="w-4 h-4 text-blue-500" />;
+      case 'failed':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Check className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
-        <div className="text-center">
-          <div className="text-6xl mb-4">💬</div>
-          <p className="text-lg font-medium">ابدأ المحادثة مع العميل</p>
-          <p className="text-sm mt-2">اكتب رسالتك في الأسفل</p>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <p className="text-gray-600 font-medium">ابدأ المحادثة</p>
+          <p className="text-gray-400 text-sm mt-1">أرسل رسالة للبدء</p>
         </div>
       </div>
     );
@@ -67,26 +91,28 @@ export default function ChatMessageList({ messages }: ChatMessageListProps) {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-gray-50 to-gray-100">
+    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 md:px-16 lg:px-24">
       {groupedMessages.map((group, groupIndex) => (
         <div key={groupIndex}>
-          {/* Date separator */}
-          <div className="flex justify-center mb-4">
-            <div className="bg-white/80 backdrop-blur-sm text-gray-600 text-xs font-medium px-4 py-1.5 rounded-full shadow-sm border border-gray-200">
+          {/* Date separator - WhatsApp style */}
+          <div className="flex justify-center my-3">
+            <div className="bg-white/90 text-gray-600 text-xs font-medium px-3 py-1.5 rounded-lg shadow-sm">
               {group.date}
             </div>
           </div>
 
           {/* Messages in this date group */}
-          <div className="space-y-3">
+          <div className="space-y-1">
             {group.messages.map((message) => {
               const isOutgoing = message.direction === 'out';
               const isSystem = message.direction === 'system';
+              const isFailed = message.status === 'failed';
+              const isPending = message.status === 'pending';
 
               if (isSystem) {
                 return (
-                  <div key={message.id} className="flex justify-center">
-                    <div className="bg-amber-50 text-amber-800 text-xs px-4 py-2 rounded-lg border border-amber-200 shadow-sm">
+                  <div key={message.id} className="flex justify-center my-2">
+                    <div className="bg-yellow-50/90 text-yellow-800 text-xs px-3 py-1.5 rounded-lg shadow-sm">
                       {message.body}
                     </div>
                   </div>
@@ -96,39 +122,59 @@ export default function ChatMessageList({ messages }: ChatMessageListProps) {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
+                  className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex items-end gap-2 max-w-[75%] ${isOutgoing ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Avatar */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md ${
-                      isOutgoing ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                    }`}>
-                      {isOutgoing ? 'أنت' : 'ع'}
-                    </div>
-
-                    {/* Message bubble */}
+                  <div className={`relative max-w-[65%] ${isPending ? 'opacity-70' : ''}`}>
+                    {/* Message bubble - WhatsApp style */}
                     <div
-                      className={`rounded-2xl px-4 py-2.5 shadow-md ${
+                      className={`relative rounded-lg px-3 py-2 shadow-sm ${
                         isOutgoing
-                          ? 'bg-gradient-to-br from-green-500 to-green-600 text-white rounded-br-sm'
-                          : 'bg-white text-gray-900 rounded-bl-sm border border-gray-200'
+                          ? `${isFailed ? 'bg-red-100' : 'bg-[#d9fdd3]'} rounded-tr-none`
+                          : 'bg-white rounded-tl-none'
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.body}</p>
+                      {/* Bubble tail */}
+                      <div
+                        className={`absolute top-0 w-3 h-3 ${
+                          isOutgoing
+                            ? `${isFailed ? 'bg-red-100' : 'bg-[#d9fdd3]'} -right-2`
+                            : 'bg-white -left-2'
+                        }`}
+                        style={{
+                          clipPath: isOutgoing
+                            ? 'polygon(0 0, 100% 0, 0 100%)'
+                            : 'polygon(100% 0, 0 0, 100% 100%)',
+                        }}
+                      />
                       
-                      <div className={`flex items-center gap-1 mt-1.5 text-xs ${
-                        isOutgoing ? 'text-green-100 justify-end' : 'text-gray-500 justify-start'
-                      }`}>
-                        <span className="font-medium">{formatTime(message.createdAt)}</span>
-                        {message.status && isOutgoing && (
-                          <span className="mr-1">
-                            {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
-                            {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
-                            {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5 text-blue-200" />}
+                      {/* Message content */}
+                      <p className="text-sm text-gray-900 whitespace-pre-wrap break-words leading-relaxed">
+                        {message.body}
+                      </p>
+                      
+                      {/* Time and status */}
+                      <div className={`flex items-center gap-1 mt-1 justify-end`}>
+                        <span className="text-[11px] text-gray-500">
+                          {formatTime(message.createdAt)}
+                        </span>
+                        {isOutgoing && (
+                          <span className="ml-0.5">
+                            {renderStatusIcon(message.status)}
                           </span>
                         )}
                       </div>
                     </div>
+
+                    {/* Retry button for failed messages */}
+                    {isFailed && onRetry && (
+                      <button
+                        onClick={() => onRetry(message.id)}
+                        className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-red-100 hover:bg-red-200 transition-colors"
+                        title="إعادة المحاولة"
+                      >
+                        <RefreshCw className="w-4 h-4 text-red-600" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -136,7 +182,7 @@ export default function ChatMessageList({ messages }: ChatMessageListProps) {
           </div>
         </div>
       ))}
-      <div ref={messagesEndRef} />
+      <div ref={messagesEndRef} className="h-1" />
     </div>
   );
 }
