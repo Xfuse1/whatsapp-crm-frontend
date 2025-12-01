@@ -5,11 +5,22 @@ let socket: Socket | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
+// Extract base URL without /api path for Socket.io connection
+function getSocketUrl(): string {
+  let url = config.apiBaseUrl;
+  // Remove /api suffix if present (Socket.io connects to root)
+  if (url.endsWith('/api')) {
+    url = url.slice(0, -4);
+  }
+  return url;
+}
+
 export function getSocket(): Socket {
   if (!socket) {
-    console.log('[Socket.io] Connecting to:', config.apiBaseUrl);
+    const socketUrl = getSocketUrl();
+    console.log('[Socket.io] Connecting to:', socketUrl);
     
-    socket = io(config.apiBaseUrl, {
+    socket = io(socketUrl, {
       autoConnect: true,
       // Important for cross-origin connections (Vercel -> Render)
       transports: ['websocket', 'polling'],

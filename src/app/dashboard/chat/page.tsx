@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Chat, ChatMessage } from '@/types/whatsapp';
-import { fetchChats, fetchMessages, sendWhatsAppMessage } from '@/lib/apiClient';
+import { fetchChats, fetchMessages, sendWhatsAppMessage, apiClient } from '@/lib/apiClient';
 import { getSocket, isSocketConnected } from '@/lib/socket';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatMessageList from '@/components/chat/ChatMessageList';
 import ChatInput from '@/components/chat/ChatInput';
+import Link from 'next/link';
 
 // Play notification sound for incoming messages
 const playNotificationSound = () => {
@@ -48,6 +49,7 @@ export default function ChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(null);
   
   // Store contact JID for the selected chat
   const contactJidRef = useRef<string | null>(null);
@@ -55,6 +57,24 @@ export default function ChatPage() {
   // Request notification permission on mount
   useEffect(() => {
     requestNotificationPermission();
+  }, []);
+
+  // Check WhatsApp connection status
+  useEffect(() => {
+    const checkWhatsAppStatus = async () => {
+      try {
+        const response = await apiClient.get<{ isConnected: boolean }>('/api/whatsapp/status');
+        setWhatsappConnected(response.isConnected);
+      } catch (err) {
+        console.error('[Chat] Failed to check WhatsApp status:', err);
+        setWhatsappConnected(false);
+      }
+    };
+
+    checkWhatsAppStatus();
+    // Check every 30 seconds
+    const interval = setInterval(checkWhatsAppStatus, 30000);
+    return () => clearInterval(interval);
   }, []);
   
   // Deduplicate messages by ID
@@ -162,11 +182,25 @@ export default function ChatPage() {
       setSocketConnected(false);
     };
 
+    // Handle WhatsApp ready (connected)
+    const handleWhatsAppReady = (payload: { sessionId: string; phoneNumber?: string }) => {
+      console.log('[Chat] WhatsApp ready:', payload);
+      setWhatsappConnected(true);
+    };
+
+    // Handle WhatsApp disconnected
+    const handleWhatsAppDisconnected = (payload: { sessionId: string; reason?: string }) => {
+      console.log('[Chat] WhatsApp disconnected:', payload);
+      setWhatsappConnected(false);
+    };
+
     // Set initial connection status
     setSocketConnected(socket.connected);
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
+    socket.on('whatsapp:ready', handleWhatsAppReady);
+    socket.on('whatsapp:disconnected', handleWhatsAppDisconnected);
 
     // Handle incoming messages
     const handleIncomingMessage = (payload: {
@@ -289,6 +323,8 @@ export default function ChatPage() {
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
+      socket.off('whatsapp:ready', handleWhatsAppReady);
+      socket.off('whatsapp:disconnected', handleWhatsAppDisconnected);
       socket.off('message:incoming', handleIncomingMessage);
       socket.off('message:sent', handleMessageSent);
       socket.off('message:status', handleMessageStatus);
@@ -376,7 +412,19 @@ export default function ChatPage() {
         prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m))
       );
       
-      setError(err?.message || 'فشل إرسال الرسالة. حاول مرة أخرى.');
+      // Show appropriate error message
+      let errorMsg = 'فشل إرسال الرسالة. حاول مرة أخرى.';
+      if (err?.message?.includes('not connected') || err?.message?.includes('NOT_CONNECTED')) {
+        errorMsg = 'واتساب غير متصل! اذهب لصفحة "ربط واتساب" وامسح رمز QR.';
+        setWhatsappConnected(false);
+      } else if (err?.message?.includes('503')) {
+        errorMsg = 'واتساب غير متصل! يرجى مسح رمز QR أولاً.';
+        setWhatsappConnected(false);
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      
+      setError(errorMsg);
     } finally {
       setIsSending(false);
     }
@@ -447,6 +495,26 @@ export default function ChatPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <span className="text-sm text-yellow-700">الاتصال المباشر غير متاح. الرسائل قد تتأخر.</span>
+              </div>
+            )}
+
+            {/* WhatsApp not connected banner */}
+            {whatsappConnected === false && (
+              <div className="bg-red-50 border-b border-red-300 px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                  <span className="text-sm text-red-700 font-medium">
+                    واتساب غير متصل! يرجى مسح رمز QR لتفعيل الإرسال والاستقبال.
+                  </span>
+                </div>
+                <Link
+                  href="/dashboard/whatsapp"
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  ربط واتساب
+                </Link>
               </div>
             )}
 
