@@ -37,12 +37,16 @@ class ApiClient {
       throw new Error('Rate limited. Please wait before making more requests.');
     }
 
+    const url = `${this.baseUrl}${path}`;
+    
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Add mode to help with CORS debugging
+        mode: 'cors',
       });
 
       // Handle rate limiting (429)
@@ -54,30 +58,43 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        const err = new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+        const errorBody = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        const err = new Error(errorBody.error || errorBody.message || `HTTP ${response.status}: ${response.statusText}`);
         (err as any).status = response.status;
         throw err;
       }
 
       return response.json();
     } catch (error: any) {
-      console.error(`[API] GET ${path} failed:`, error);
+      // Enhance error messages for common issues
+      let enhancedError = error;
+      
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        // This is usually a CORS or network error
+        enhancedError = new Error(`Network error: Unable to reach ${url}. This could be a CORS issue or the server is down.`);
+        (enhancedError as any).originalError = error;
+        console.error(`[API] GET ${path} - Network/CORS error. Check if:
+          1. Backend is running at ${this.baseUrl}
+          2. CLIENT_ORIGIN on backend includes frontend URL
+          3. Network is available`);
+      }
+      
+      console.error(`[API] GET ${path} failed:`, enhancedError);
 
       // Don't retry on rate limit
       if (error?.status === 429) {
         throw error;
       }
 
-      // Retry logic for other errors
-      if (retryCount < MAX_RETRIES && !error?.message?.includes('Rate limited')) {
+      // Retry logic for network errors
+      if (retryCount < MAX_RETRIES && (error?.name === 'TypeError' || !error?.status)) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
         console.log(`[API] Retrying GET ${path} in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
         await this.delay(delay);
         return this.get<T>(path, retryCount + 1);
       }
 
-      throw error;
+      throw enhancedError;
     }
   }
 
