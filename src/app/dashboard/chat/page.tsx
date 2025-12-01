@@ -8,6 +8,37 @@ import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatMessageList from '@/components/chat/ChatMessageList';
 import ChatInput from '@/components/chat/ChatInput';
 
+// Play notification sound for incoming messages
+const playNotificationSound = () => {
+  try {
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(() => {
+      // Ignore errors if audio can't play (user hasn't interacted yet)
+    });
+  } catch (e) {
+    // Ignore if audio not supported
+  }
+};
+
+// Show browser notification
+const showNotification = (title: string, body: string) => {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, {
+      body,
+      icon: '/icons/whatsapp-icon.svg',
+      tag: 'whatsapp-message',
+    });
+  }
+};
+
+// Request notification permission
+const requestNotificationPermission = () => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+};
+
 export default function ChatPage() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
@@ -19,6 +50,11 @@ export default function ChatPage() {
   
   // Store contact JID for the selected chat
   const contactJidRef = useRef<string | null>(null);
+  
+  // Request notification permission on mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
   
   // Deduplicate messages by ID
   const addMessageIfNew = useCallback((newMessage: ChatMessage) => {
@@ -118,24 +154,42 @@ export default function ChatPage() {
     const handleIncomingMessage = (payload: {
       chatId: string;
       message: any;
-      sessionKey?: string;
+      contact?: any;
+      sessionId?: string;
     }) => {
       console.log('[Chat] Incoming message:', payload);
 
+      // Map message fields from backend format
+      const msg = payload.message;
       const newMessage: ChatMessage = {
-        id: payload.message.id || `msg-${Date.now()}`,
-        chatId: payload.message.chat_id || payload.chatId,
-        direction: payload.message.direction || 'in',
-        body: payload.message.body || '',
-        createdAt: payload.message.created_at || new Date().toISOString(),
-        fromJid: payload.message.from_jid || null,
-        toJid: payload.message.to_jid || null,
-        status: payload.message.status || null,
+        id: msg.id || `msg-${Date.now()}`,
+        chatId: payload.chatId,
+        direction: msg.direction || 'in',
+        body: msg.body || '',
+        createdAt: msg.timestamp || msg.created_at || new Date().toISOString(),
+        fromJid: msg.from || msg.from_jid || null,
+        toJid: msg.to || msg.to_jid || null,
+        status: msg.status || null,
       };
 
       // Update contact JID if this is the selected chat
       if (selectedChatId === payload.chatId && newMessage.fromJid) {
         contactJidRef.current = newMessage.fromJid;
+      }
+
+      // Play sound and show notification for incoming messages (not our own)
+      if (newMessage.direction === 'in') {
+        playNotificationSound();
+        
+        // Get contact name from payload or chat list
+        const contactName = payload.contact?.displayName || 
+          chats.find(c => c.id === payload.chatId)?.title || 
+          'رسالة جديدة';
+        
+        // Show browser notification if not focused on this chat
+        if (selectedChatId !== payload.chatId || document.hidden) {
+          showNotification(contactName, newMessage.body || 'رسالة جديدة');
+        }
       }
 
       // Update chats list (move chat to top, update last message time)
@@ -220,7 +274,7 @@ export default function ChatPage() {
       socket.off('message:status', handleMessageStatus);
       socket.off('whatsapp:message', handleIncomingMessage);
     };
-  }, [selectedChatId, addMessageIfNew, updateMessageStatus]);
+  }, [selectedChatId, chats, addMessageIfNew, updateMessageStatus]);
 
   // Handle selecting a chat
   const handleSelectChat = useCallback((chatId: string) => {
