@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Chat, ChatMessage } from '@/types/whatsapp';
 import { fetchChats, fetchMessages, sendWhatsAppMessage } from '@/lib/apiClient';
-import { getSocket } from '@/lib/socket';
+import { getSocket, isSocketConnected } from '@/lib/socket';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatMessageList from '@/components/chat/ChatMessageList';
 import ChatInput from '@/components/chat/ChatInput';
@@ -47,6 +47,7 @@ export default function ChatPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   
   // Store contact JID for the selected chat
   const contactJidRef = useRef<string | null>(null);
@@ -149,6 +150,23 @@ export default function ChatPage() {
   // Socket events: incoming messages, sent confirmations, status updates
   useEffect(() => {
     const socket = getSocket();
+
+    // Track socket connection status
+    const handleConnect = () => {
+      console.log('[Chat] Socket connected');
+      setSocketConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      console.log('[Chat] Socket disconnected');
+      setSocketConnected(false);
+    };
+
+    // Set initial connection status
+    setSocketConnected(socket.connected);
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     // Handle incoming messages
     const handleIncomingMessage = (payload: {
@@ -269,6 +287,8 @@ export default function ChatPage() {
     socket.on('whatsapp:message', handleIncomingMessage); // Alternative event name
 
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('message:incoming', handleIncomingMessage);
       socket.off('message:sent', handleMessageSent);
       socket.off('message:status', handleMessageStatus);
@@ -406,9 +426,29 @@ export default function ChatPage() {
                 <h2 className="text-base font-medium text-gray-900 truncate">
                   {selectedChat.title || 'محادثة'}
                 </h2>
-                <p className="text-xs text-gray-500">اضغط للمزيد من المعلومات</p>
+                <div className="flex items-center gap-2">
+                  {/* Connection status indicator */}
+                  <span className={`inline-flex items-center gap-1 text-xs ${
+                    socketConnected ? 'text-green-600' : 'text-gray-400'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      socketConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                    }`}></span>
+                    {socketConnected ? 'متصل' : 'غير متصل'}
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Connection warning banner */}
+            {!socketConnected && (
+              <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex items-center gap-2">
+                <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span className="text-sm text-yellow-700">الاتصال المباشر غير متاح. الرسائل قد تتأخر.</span>
+              </div>
+            )}
 
             {/* Error banner */}
             {error && (
