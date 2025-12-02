@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AuthCard from '@/components/auth/AuthCard';
-import { supabaseBrowserClient } from '@/lib/supabaseClient';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -34,19 +33,32 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabaseBrowserClient.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-          },
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      // Redirect to dashboard or login with success message
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'فشل إنشاء الحساب');
+      }
+
+      // Store token in localStorage
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
+      // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'فشل إنشاء الحساب');

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AuthCard from '@/components/auth/AuthCard';
-import { supabaseBrowserClient } from '@/lib/supabaseClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,20 +18,28 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // TODO: Implement real authentication later
-      // For now, skip auth and go directly to dashboard
-      router.push('/dashboard');
-      
-      /* Real auth code (disabled for now):
-      const { error } = await supabaseBrowserClient.auth.signInWithPassword({
-        email,
-        password,
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'فشل تسجيل الدخول');
+      }
+
+      // Store token in localStorage
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
 
       router.push('/dashboard');
-      */
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'فشل تسجيل الدخول');
     } finally {
