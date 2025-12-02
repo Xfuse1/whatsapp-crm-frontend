@@ -145,8 +145,13 @@ export default function ChatPage() {
         const data = await fetchMessages(selectedChatId);
         setMessages(data);
         
-        // Extract contact JID from messages
-        if (data.length > 0) {
+        // Get contact JID from selected chat first
+        const selectedChat = chats.find((c) => c.id === selectedChatId);
+        if (selectedChat?.contactJid) {
+          contactJidRef.current = selectedChat.contactJid;
+          console.log('[Chat] Contact JID from chat:', contactJidRef.current);
+        } else if (data.length > 0) {
+          // Fallback: extract from messages
           const lastIncoming = data.filter((m) => m.direction === 'in').pop();
           const lastOutgoing = data.filter((m) => m.direction === 'out').pop();
           
@@ -155,6 +160,7 @@ export default function ChatPage() {
           } else if (lastOutgoing?.toJid) {
             contactJidRef.current = lastOutgoing.toJid;
           }
+          console.log('[Chat] Contact JID from messages:', contactJidRef.current);
         }
       } catch (err) {
         console.error('[Chat] Failed to load messages:', err);
@@ -165,7 +171,7 @@ export default function ChatPage() {
     };
 
     loadMessages();
-  }, [selectedChatId]);
+  }, [selectedChatId, chats]);
 
   // Socket events: incoming messages, sent confirmations, status updates
   useEffect(() => {
@@ -349,20 +355,32 @@ export default function ChatPage() {
       return;
     }
 
-    // Determine recipient JID
+    // Determine recipient JID - try multiple sources
     let toJid = contactJidRef.current;
 
+    // If no JID in ref, try to get from selected chat
     if (!toJid) {
-      // Fallback: try to get from messages
+      const selectedChat = chats.find((c) => c.id === selectedChatId);
+      if (selectedChat?.contactJid) {
+        toJid = selectedChat.contactJid;
+        contactJidRef.current = toJid; // Store for future use
+        console.log('[Chat] Got JID from chat object:', toJid);
+      }
+    }
+
+    // Fallback: try to get from messages
+    if (!toJid && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage) {
-        toJid = (lastMessage.direction === 'in' ? lastMessage.fromJid : lastMessage.toJid) || null;
+      toJid = (lastMessage.direction === 'in' ? lastMessage.fromJid : lastMessage.toJid) || null;
+      if (toJid) {
+        contactJidRef.current = toJid;
+        console.log('[Chat] Got JID from last message:', toJid);
       }
     }
 
     if (!toJid) {
-      console.error('[Chat] Cannot determine recipient JID');
-      setError('لا يمكن تحديد المستلم. الرجاء تحديث الصفحة.');
+      console.error('[Chat] Cannot determine recipient JID. Selected chat:', selectedChatId);
+      setError('لا يمكن تحديد المستلم. الرجاء تحديث الصفحة أو اختيار محادثة أخرى.');
       return;
     }
 

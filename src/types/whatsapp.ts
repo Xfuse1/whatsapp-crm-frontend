@@ -35,6 +35,7 @@ export interface Chat {
   type: 'single' | 'group' | 'broadcast' | string;
   lastMessageAt: string | null;
   unreadCount?: number;
+  contactJid?: string | null; // WhatsApp JID for sending messages
 }
 
 export interface ChatMessage {
