@@ -25,6 +25,8 @@ export default function WhatsAppConnectionCard() {
   const retryCountRef = useRef(0);
   const isPollingPaused = useRef(false);
 
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
   // Redirect to chats when connected
   const redirectToChats = useCallback(() => {
     if (!hasRedirected.current) {
@@ -164,6 +166,20 @@ export default function WhatsAppConnectionCard() {
       setStatus(null);
       setQrCode(null);
       hasRedirected.current = false;
+      // Restart polling to get new QR
+      startPolling();
+      startStatusPolling();
+    });
+
+    socket.on('whatsapp:logged_out', () => {
+      console.log('[WhatsApp Connection] Logged out');
+      setStatus(null);
+      setQrCode(null);
+      hasRedirected.current = false;
+      setLogoutLoading(false);
+      // Restart polling to get new QR
+      startPolling();
+      startStatusPolling();
     });
 
     return () => {
@@ -171,10 +187,11 @@ export default function WhatsAppConnectionCard() {
       socket.off('whatsapp:qr');
       socket.off('whatsapp:authenticated');
       socket.off('whatsapp:disconnected');
+      socket.off('whatsapp:logged_out');
       stopPolling();
       stopStatusPolling();
     };
-  }, [checkStatus, redirectToChats, stopPolling, stopStatusPolling]);
+  }, [checkStatus, redirectToChats, stopPolling, stopStatusPolling, startPolling, startStatusPolling]);
 
   const handleConnect = async () => {
     setLoading(true);
@@ -204,6 +221,21 @@ export default function WhatsAppConnectionCard() {
     router.push('/dashboard/chat');
   };
 
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    setError('');
+    
+    try {
+      await apiClient.post('/api/whatsapp/logout', {});
+      console.log('[WhatsApp] Logout request sent');
+      // The socket event 'whatsapp:logged_out' will handle state updates
+    } catch (err) {
+      console.error('[WhatsApp] Logout failed:', err);
+      setError(err instanceof Error ? err.message : 'فشل تسجيل الخروج');
+      setLogoutLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-8">
       {status?.isConnected ? (
@@ -214,12 +246,21 @@ export default function WhatsAppConnectionCard() {
           <p className="text-gray-600">
             حسابك متصل برقم: <span className="font-semibold">{status.phoneNumber}</span>
           </p>
-          <button
-            onClick={handleGoToChats}
-            className="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-          >
-            الذهاب إلى المحادثات
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={handleGoToChats}
+              className="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+            >
+              الذهاب إلى المحادثات
+            </button>
+            <button
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+            >
+              {logoutLoading ? 'جاري تسجيل الخروج...' : 'تسجيل الخروج من WhatsApp'}
+            </button>
+          </div>
         </div>
       ) : qrCode ? (
         // QR Code Display State
