@@ -241,13 +241,17 @@ export default function ChatPage() {
       // Extract phone number from JID for comparison
       const extractPhone = (jid: string | null | undefined) => {
         if (!jid) return null;
-        return jid.replace(/@(s\.whatsapp\.net|c\.us)$/, '').replace(/^\+/, '');
+        return jid.replace(/@(s\.whatsapp\.net|c\.us|:\d+@s\.whatsapp\.net)$/, '').replace(/^\+/, '');
       };
       
-      const messagePhone = extractPhone(newMessage.fromJid);
+      // For outgoing messages, use toJid; for incoming, use fromJid
+      const remoteJid = newMessage.direction === 'out' ? newMessage.toJid : newMessage.fromJid;
+      const messagePhone = extractPhone(remoteJid);
       const currentContactPhone = extractPhone(contactJidRef.current);
       
       console.log('[Chat] Phone comparison:', {
+        direction: newMessage.direction,
+        remoteJid,
         messagePhone,
         currentContactPhone,
         selectedChatId: selectedChatIdRef.current,
@@ -262,8 +266,8 @@ export default function ChatPage() {
       const isCurrentChat = isSameChatId || isSameContact;
 
       // Update contact JID if this is the selected chat
-      if (isCurrentChat && newMessage.fromJid) {
-        contactJidRef.current = newMessage.fromJid;
+      if (isCurrentChat && remoteJid) {
+        contactJidRef.current = remoteJid;
       }
 
       // Play sound and show notification for incoming messages (not our own)
