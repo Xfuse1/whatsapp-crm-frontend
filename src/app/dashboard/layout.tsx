@@ -1,19 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Topbar from '@/components/layout/Topbar';
 import Sidebar from '@/components/layout/Sidebar';
+import { isAuthenticated } from '@/lib/auth';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  // TODO: Check Supabase session and redirect to /login if not authenticated
-  // useEffect(() => {
-  //   const checkAuth = async () => {
-  //     const { data: { session } } = await supabaseBrowserClient.auth.getSession();
-  //     if (!session) {
-  //       router.push('/login');
-  //     }
-  //   };
-  //   checkAuth();
-  // }, []);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if user is authenticated
+    if (!isAuthenticated()) {
+      router.push('/login');
+    }
+  }, [router]);
 
   return (
     <div className="h-screen flex flex-col">

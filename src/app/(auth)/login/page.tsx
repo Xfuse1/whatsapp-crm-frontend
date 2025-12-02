@@ -33,10 +33,12 @@ export default function LoginPage() {
         throw new Error(data.message || data.error || 'فشل تسجيل الدخول');
       }
 
-      // Store token in localStorage
+      // Store token in localStorage and cookie
       if (data.token) {
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        // Set cookie for middleware
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7 days
       }
 
       router.push('/dashboard');
@@ -97,14 +99,6 @@ export default function LoginPage() {
               className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold py-3 rounded-lg transition-colors"
             >
               {loading ? 'جاري التحميل...' : 'تسجيل الدخول'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition-colors"
-            >
-              تخطي والدخول مباشرة (Demo Mode)
             </button>
 
             <div className="text-center pt-2">

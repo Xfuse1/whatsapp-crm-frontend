@@ -9,11 +9,30 @@ const RATE_LIMIT_DELAY = 30000; // 30 seconds
 // Simple in-memory cache for rate limiting
 let rateLimitedUntil = 0;
 
+// Get auth token from localStorage
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+}
+
 class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
   }
 
   private async delay(ms: number): Promise<void> {
@@ -42,9 +61,7 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         // Add mode to help with CORS debugging
         mode: 'cors',
       });
@@ -109,9 +126,7 @@ class ApiClient {
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: body ? JSON.stringify(body) : undefined,
       });
 
