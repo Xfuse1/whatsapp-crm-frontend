@@ -215,7 +215,7 @@ export default function ChatPage() {
       contact?: any;
       sessionId?: string;
     }) => {
-      console.log('[Chat] Incoming message:', payload);
+      console.log('[Chat] Incoming message payload:', JSON.stringify(payload, null, 2));
 
       // Map message fields from backend format
       const msg = payload.message;
@@ -224,11 +224,14 @@ export default function ChatPage() {
         chatId: payload.chatId,
         direction: msg.direction || 'in',
         body: msg.body || '',
-        createdAt: msg.timestamp || msg.created_at || new Date().toISOString(),
-        fromJid: msg.from || msg.from_jid || null,
-        toJid: msg.to || msg.to_jid || null,
+        createdAt: msg.timestamp || msg.createdAt || msg.created_at || new Date().toISOString(),
+        fromJid: msg.from || msg.fromJid || msg.from_jid || null,
+        toJid: msg.to || msg.toJid || msg.to_jid || null,
         status: msg.status || null,
       };
+
+      console.log('[Chat] Mapped message:', newMessage);
+      console.log('[Chat] Selected chat:', selectedChatId, 'Message chat:', payload.chatId);
 
       // Update contact JID if this is the selected chat
       if (selectedChatId === payload.chatId && newMessage.fromJid) {
@@ -281,19 +284,22 @@ export default function ChatPage() {
       message: any;
       tempId?: string;
     }) => {
-      console.log('[Chat] Message sent confirmation:', payload);
+      console.log('[Chat] Message sent confirmation payload:', JSON.stringify(payload, null, 2));
 
       if (selectedChatId === payload.chatId) {
+        const msg = payload.message;
         const confirmedMessage: ChatMessage = {
-          id: payload.message.id,
+          id: msg.id,
           chatId: payload.chatId,
           direction: 'out',
-          body: payload.message.body || '',
-          createdAt: payload.message.created_at || new Date().toISOString(),
+          body: msg.body || '',
+          createdAt: msg.createdAt || msg.created_at || new Date().toISOString(),
           fromJid: null,
-          toJid: payload.message.to_jid || contactJidRef.current,
-          status: payload.message.status || 'sent',
+          toJid: msg.to || msg.toJid || msg.to_jid || contactJidRef.current,
+          status: msg.status || 'sent',
         };
+
+        console.log('[Chat] Confirmed message:', confirmedMessage);
 
         // Replace temp message with confirmed one
         setMessages((prev) =>
