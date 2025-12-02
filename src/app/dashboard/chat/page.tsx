@@ -530,6 +530,16 @@ export default function ChatPage() {
   // Determine selected chat for header
   const selectedChat = chats.find((c) => c.id === selectedChatId);
 
+  // Handle new contact created - refresh chat list
+  const handleContactCreated = async (chatId: string) => {
+    try {
+      const data = await fetchChats();
+      setChats(data);
+    } catch (err) {
+      console.error('[Chat] Failed to refresh chats:', err);
+    }
+  };
+
   return (
     <div className="h-full flex bg-gray-100">
       {/* Sidebar */}
@@ -537,6 +547,7 @@ export default function ChatPage() {
         chats={chats}
         selectedChatId={selectedChatId}
         onSelectChat={handleSelectChat}
+        onContactCreated={handleContactCreated}
         isLoading={isLoadingChats}
       />
 

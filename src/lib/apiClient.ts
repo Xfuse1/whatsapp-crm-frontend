@@ -216,3 +216,24 @@ export interface SendMessageResponse {
 export async function sendWhatsAppMessage(to: string, message: string): Promise<SendMessageResponse> {
   return await apiClient.post<SendMessageResponse>('/api/whatsapp/send', { to, message });
 }
+
+export interface CreateContactResponse {
+  success: boolean;
+  contact: {
+    id: string;
+    waId: string;
+    displayName: string | null;
+  };
+  chat: {
+    id: string;
+    contactId: string;
+    contactJid: string;
+  };
+}
+
+export async function createContact(phoneNumber: string, displayName?: string): Promise<CreateContactResponse> {
+  return await apiClient.post<CreateContactResponse>('/api/whatsapp/contacts', { 
+    phoneNumber, 
+    displayName 
+  });
+}

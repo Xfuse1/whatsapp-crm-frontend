@@ -1,18 +1,25 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, X, MessageSquare } from 'lucide-react';
+import { Search, X, MessageSquare, UserPlus, Phone, User } from 'lucide-react';
 import type { Chat } from '@/types/whatsapp';
+import { createContact } from '@/lib/apiClient';
 
 interface ChatSidebarProps {
   chats: Chat[];
   selectedChatId?: string;
   onSelectChat: (chatId: string) => void;
+  onContactCreated?: (chatId: string) => void;
   isLoading?: boolean;
 }
 
-export default function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading = false }: ChatSidebarProps) {
+export default function ChatSidebar({ chats, selectedChatId, onSelectChat, onContactCreated, isLoading = false }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactName, setNewContactName] = useState('');
+  const [isCreatingContact, setIsCreatingContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
 
   const formatTime = (dateString: string | null) => {
     if (!dateString) return '';
@@ -48,6 +55,37 @@ export default function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoa
     });
   }, [chats, searchQuery]);
 
+  // Handle creating new contact
+  const handleCreateContact = async () => {
+    if (!newContactPhone.trim()) {
+      setContactError('يرجى إدخال رقم الهاتف');
+      return;
+    }
+
+    setIsCreatingContact(true);
+    setContactError(null);
+
+    try {
+      const result = await createContact(newContactPhone, newContactName || undefined);
+      
+      // Close modal and reset form
+      setShowNewContactModal(false);
+      setNewContactPhone('');
+      setNewContactName('');
+      
+      // Select the new chat
+      if (result.chat?.id) {
+        onSelectChat(result.chat.id);
+        onContactCreated?.(result.chat.id);
+      }
+    } catch (error: any) {
+      console.error('Failed to create contact:', error);
+      setContactError(error.message || 'فشل إنشاء جهة الاتصال');
+    } finally {
+      setIsCreatingContact(false);
+    }
+  };
+
   return (
     <div className="w-[340px] bg-white border-r border-gray-200 flex flex-col">
       {/* Header - WhatsApp style */}
@@ -56,9 +94,113 @@ export default function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoa
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white">
             <MessageSquare className="w-5 h-5" />
           </div>
+          {/* Add new contact button */}
+          <button
+            onClick={() => setShowNewContactModal(true)}
+            className="w-10 h-10 rounded-full bg-teal-500 hover:bg-teal-600 flex items-center justify-center text-white transition-colors"
+            title="إضافة جهة اتصال جديدة"
+          >
+            <UserPlus className="w-5 h-5" />
+          </button>
         </div>
         <h2 className="text-base font-medium text-gray-700">المحادثات</h2>
       </div>
+
+      {/* New Contact Modal */}
+      {showNewContactModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-teal-500 text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">إضافة جهة اتصال جديدة</h3>
+              <button
+                onClick={() => {
+                  setShowNewContactModal(false);
+                  setContactError(null);
+                  setNewContactPhone('');
+                  setNewContactName('');
+                }}
+                className="text-white/80 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Phone Number */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  رقم الهاتف *
+                </label>
+                <div className="relative">
+                  <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={newContactPhone}
+                    onChange={(e) => setNewContactPhone(e.target.value)}
+                    placeholder="201234567890"
+                    className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    dir="ltr"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">أدخل الرقم بالكامل مع كود الدولة (مثال: 201234567890)</p>
+              </div>
+              
+              {/* Display Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  الاسم (اختياري)
+                </label>
+                <div className="relative">
+                  <User className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="اسم جهة الاتصال"
+                    className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              
+              {/* Error Message */}
+              {contactError && (
+                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg">
+                  {contactError}
+                </div>
+              )}
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowNewContactModal(false);
+                  setContactError(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleCreateContact}
+                disabled={isCreatingContact || !newContactPhone.trim()}
+                className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {isCreatingContact ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    جاري الإنشاء...
+                  </>
+                ) : (
+                  'بدء المحادثة'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Search bar */}
       <div className="px-3 py-2 bg-white border-b border-gray-100">
