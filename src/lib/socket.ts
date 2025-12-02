@@ -4,6 +4,7 @@ import { config } from './env';
 let socket: Socket | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
+let isAuthenticated = false;
 
 // Extract base URL without /api path for Socket.io connection
 function getSocketUrl(): string {
@@ -13,6 +14,12 @@ function getSocketUrl(): string {
     url = url.slice(0, -4);
   }
   return url;
+}
+
+// Get token from localStorage
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
 }
 
 export function getSocket(): Socket {
@@ -37,10 +44,30 @@ export function getSocket(): Socket {
     socket.on('connect', () => {
       console.log('[Socket.io] ✅ Connected to server, ID:', socket?.id);
       reconnectAttempts = 0;
+      
+      // Authenticate with token after connecting
+      const token = getAuthToken();
+      if (token && socket) {
+        console.log('[Socket.io] 🔐 Sending authentication...');
+        socket.emit('auth', { token });
+      } else {
+        console.warn('[Socket.io] ⚠️ No token found, socket not authenticated');
+      }
+    });
+
+    socket.on('auth:success', (data) => {
+      console.log('[Socket.io] ✅ Authenticated as user:', data.userId);
+      isAuthenticated = true;
+    });
+
+    socket.on('auth:error', (data) => {
+      console.error('[Socket.io] ❌ Authentication failed:', data.message);
+      isAuthenticated = false;
     });
 
     socket.on('disconnect', (reason) => {
       console.log('[Socket.io] ❌ Disconnected:', reason);
+      isAuthenticated = false;
     });
 
     socket.on('connect_error', (error) => {
@@ -89,6 +116,20 @@ export function getSocket(): Socket {
 // Check if socket is connected
 export function isSocketConnected(): boolean {
   return socket?.connected ?? false;
+}
+
+// Check if socket is authenticated
+export function isSocketAuthenticated(): boolean {
+  return isAuthenticated;
+}
+
+// Re-authenticate socket (call after login)
+export function authenticateSocket(): void {
+  const token = getAuthToken();
+  if (token && socket?.connected) {
+    console.log('[Socket.io] 🔐 Re-authenticating...');
+    socket.emit('auth', { token });
+  }
 }
 
 // Force reconnect
