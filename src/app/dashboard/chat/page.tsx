@@ -54,6 +54,9 @@ export default function ChatPage() {
   // Store contact JID for the selected chat
   const contactJidRef = useRef<string | null>(null);
   
+  // Keep a ref to track selected chat ID for socket handlers
+  const selectedChatIdRef = useRef<string | undefined>(undefined);
+  
   // Request notification permission on mount
   useEffect(() => {
     requestNotificationPermission();
@@ -132,6 +135,9 @@ export default function ChatPage() {
 
   // When chat is selected, load messages
   useEffect(() => {
+    // Update ref to track current selection
+    selectedChatIdRef.current = selectedChatId;
+    
     if (!selectedChatId) {
       setMessages([]);
       contactJidRef.current = null;
@@ -248,7 +254,7 @@ export default function ChatPage() {
           'رسالة جديدة';
         
         // Show browser notification if not focused on this chat
-        if (selectedChatId !== payload.chatId || document.hidden) {
+        if (selectedChatIdRef.current !== payload.chatId || document.hidden) {
           showNotification(contactName, newMessage.body || 'رسالة جديدة');
         }
       }
@@ -264,17 +270,30 @@ export default function ChatPage() {
         
         const updatedChats = [...prev];
         const [chat] = updatedChats.splice(chatIndex, 1);
+        const currentlySelected = selectedChatIdRef.current === payload.chatId;
         const updatedChat = {
           ...chat,
           lastMessageAt: newMessage.createdAt,
-          unreadCount: selectedChatId === payload.chatId ? 0 : (chat.unreadCount || 0) + 1,
+          unreadCount: currentlySelected ? 0 : (chat.unreadCount || 0) + 1,
         };
         return [updatedChat, ...updatedChats];
       });
 
-      // Add message if it's the selected chat
-      if (selectedChatId === payload.chatId) {
-        addMessageIfNew(newMessage);
+      // Add message if it's the selected chat (use ref for fresh value)
+      const isCurrentChat = selectedChatIdRef.current === payload.chatId;
+      console.log('[Chat] Checking if current chat:', {
+        selectedChatIdRef: selectedChatIdRef.current,
+        payloadChatId: payload.chatId,
+        isCurrentChat
+      });
+      
+      if (isCurrentChat) {
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === newMessage.id);
+          if (exists) return prev;
+          console.log('[Chat] Adding message to UI');
+          return [...prev, newMessage];
+        });
       }
     };
 
@@ -286,7 +305,7 @@ export default function ChatPage() {
     }) => {
       console.log('[Chat] Message sent confirmation payload:', JSON.stringify(payload, null, 2));
 
-      if (selectedChatId === payload.chatId) {
+      if (selectedChatIdRef.current === payload.chatId) {
         const msg = payload.message;
         const confirmedMessage: ChatMessage = {
           id: msg.id,
@@ -342,11 +361,12 @@ export default function ChatPage() {
       socket.off('message:status', handleMessageStatus);
       socket.off('whatsapp:message', handleIncomingMessage);
     };
-  }, [selectedChatId, chats, addMessageIfNew, updateMessageStatus]);
+  }, [chats, addMessageIfNew, updateMessageStatus]); // Removed selectedChatId - using ref instead
 
   // Handle selecting a chat
   const handleSelectChat = useCallback((chatId: string) => {
     setSelectedChatId(chatId);
+    selectedChatIdRef.current = chatId; // Keep ref in sync
     
     // Clear unread count for selected chat
     setChats((prev) =>
