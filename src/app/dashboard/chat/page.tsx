@@ -237,10 +237,32 @@ export default function ChatPage() {
       };
 
       console.log('[Chat] Mapped message:', newMessage);
-      console.log('[Chat] Selected chat:', selectedChatId, 'Message chat:', payload.chatId);
+      
+      // Extract phone number from JID for comparison
+      const extractPhone = (jid: string | null | undefined) => {
+        if (!jid) return null;
+        return jid.replace(/@(s\.whatsapp\.net|c\.us)$/, '').replace(/^\+/, '');
+      };
+      
+      const messagePhone = extractPhone(newMessage.fromJid);
+      const currentContactPhone = extractPhone(contactJidRef.current);
+      
+      console.log('[Chat] Phone comparison:', {
+        messagePhone,
+        currentContactPhone,
+        selectedChatId: selectedChatIdRef.current,
+        payloadChatId: payload.chatId
+      });
+
+      // Check if message is for current chat by:
+      // 1. Same chat ID, OR
+      // 2. Same contact phone number (handles duplicate chats)
+      const isSameChatId = selectedChatIdRef.current === payload.chatId;
+      const isSameContact = messagePhone && currentContactPhone && messagePhone === currentContactPhone;
+      const isCurrentChat = isSameChatId || isSameContact;
 
       // Update contact JID if this is the selected chat
-      if (selectedChatId === payload.chatId && newMessage.fromJid) {
+      if (isCurrentChat && newMessage.fromJid) {
         contactJidRef.current = newMessage.fromJid;
       }
 
@@ -254,7 +276,7 @@ export default function ChatPage() {
           'رسالة جديدة';
         
         // Show browser notification if not focused on this chat
-        if (selectedChatIdRef.current !== payload.chatId || document.hidden) {
+        if (!isCurrentChat || document.hidden) {
           showNotification(contactName, newMessage.body || 'رسالة جديدة');
         }
       }
@@ -270,20 +292,18 @@ export default function ChatPage() {
         
         const updatedChats = [...prev];
         const [chat] = updatedChats.splice(chatIndex, 1);
-        const currentlySelected = selectedChatIdRef.current === payload.chatId;
         const updatedChat = {
           ...chat,
           lastMessageAt: newMessage.createdAt,
-          unreadCount: currentlySelected ? 0 : (chat.unreadCount || 0) + 1,
+          unreadCount: isCurrentChat ? 0 : (chat.unreadCount || 0) + 1,
         };
         return [updatedChat, ...updatedChats];
       });
 
-      // Add message if it's the selected chat (use ref for fresh value)
-      const isCurrentChat = selectedChatIdRef.current === payload.chatId;
+      // Add message if it's the selected chat
       console.log('[Chat] Message check:', {
-        selectedChatIdRef: selectedChatIdRef.current,
-        payloadChatId: payload.chatId,
+        isSameChatId,
+        isSameContact,
         isCurrentChat,
         messageId: newMessage.id,
         messageBody: newMessage.body?.substring(0, 30)
