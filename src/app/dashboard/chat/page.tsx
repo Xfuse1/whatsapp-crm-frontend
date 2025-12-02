@@ -149,7 +149,11 @@ export default function ChatPage() {
         setIsLoadingMessages(true);
         setError(null);
         const data = await fetchMessages(selectedChatId);
-        setMessages(data);
+        // Sort messages by createdAt ascending (oldest first, newest at bottom)
+        const sortedMessages = [...data].sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        setMessages(sortedMessages);
         
         // Get contact JID from selected chat first
         const selectedChat = chats.find((c) => c.id === selectedChatId);
@@ -321,7 +325,10 @@ export default function ChatPage() {
             console.log('[Chat] Message already exists, skipping');
             return prev;
           }
-          const updated = [...prev, newMessage];
+          // Add new message and sort by createdAt (oldest first, newest at bottom)
+          const updated = [...prev, newMessage].sort((a, b) => 
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
           console.log('[Chat] Messages count now:', updated.length);
           return updated;
         });

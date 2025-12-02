@@ -30,12 +30,19 @@ export default function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoa
     }
   };
 
-  // Filter chats based on search query (by title/name or phone number)
+  // Sort and filter chats - newest message first (like WhatsApp Web)
   const filteredChats = useMemo(() => {
-    if (!searchQuery.trim()) return chats;
+    // First sort by lastMessageAt descending (newest first)
+    const sortedChats = [...chats].sort((a, b) => {
+      const dateA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const dateB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return dateB - dateA; // Descending - newest first
+    });
+    
+    if (!searchQuery.trim()) return sortedChats;
     
     const query = searchQuery.toLowerCase().trim();
-    return chats.filter(chat => {
+    return sortedChats.filter(chat => {
       const title = (chat.title || '').toLowerCase();
       return title.includes(query);
     });
