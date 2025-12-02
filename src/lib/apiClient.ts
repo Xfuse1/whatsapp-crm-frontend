@@ -179,17 +179,25 @@ export async function fetchChats(): Promise<Chat[]> {
     type: chat.type || 'single',
     lastMessageAt: chat.last_message_at || chat.lastMessageAt || null,
     unreadCount: chat.unread_count || chat.unreadCount || 0,
+    contactJid: chat.contactJid || chat.contact_jid || null,
   }));
 }
 
 export async function fetchMessages(chatId: string): Promise<ChatMessage[]> {
   const response = await apiClient.get<{ messages: any[] }>(`/api/whatsapp/chats/${chatId}/messages`);
-  return response.messages.map((msg) => ({
+  // Sort messages by date (oldest first)
+  const sortedMessages = response.messages.sort((a, b) => {
+    const dateA = new Date(a.created_at || a.createdAt || a.sentAt || 0).getTime();
+    const dateB = new Date(b.created_at || b.createdAt || b.sentAt || 0).getTime();
+    return dateA - dateB;
+  });
+  
+  return sortedMessages.map((msg) => ({
     id: msg.id,
-    chatId: msg.chat_id || msg.chatId,
+    chatId: msg.chat_id || msg.chatId || chatId,
     direction: msg.direction,
-    body: msg.body || null,
-    createdAt: msg.created_at || msg.createdAt,
+    body: msg.body || '',
+    createdAt: msg.created_at || msg.createdAt || msg.sentAt,
     fromJid: msg.from_jid || msg.fromJid || null,
     toJid: msg.to_jid || msg.toJid || null,
     status: msg.status || null,

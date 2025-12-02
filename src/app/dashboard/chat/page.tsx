@@ -281,19 +281,28 @@ export default function ChatPage() {
 
       // Add message if it's the selected chat (use ref for fresh value)
       const isCurrentChat = selectedChatIdRef.current === payload.chatId;
-      console.log('[Chat] Checking if current chat:', {
+      console.log('[Chat] Message check:', {
         selectedChatIdRef: selectedChatIdRef.current,
         payloadChatId: payload.chatId,
-        isCurrentChat
+        isCurrentChat,
+        messageId: newMessage.id,
+        messageBody: newMessage.body?.substring(0, 30)
       });
       
       if (isCurrentChat) {
+        console.log('[Chat] ✅ Adding message to current chat');
         setMessages((prev) => {
           const exists = prev.some((m) => m.id === newMessage.id);
-          if (exists) return prev;
-          console.log('[Chat] Adding message to UI');
-          return [...prev, newMessage];
+          if (exists) {
+            console.log('[Chat] Message already exists, skipping');
+            return prev;
+          }
+          const updated = [...prev, newMessage];
+          console.log('[Chat] Messages count now:', updated.length);
+          return updated;
         });
+      } else {
+        console.log('[Chat] ❌ Message is for different chat, not adding to UI');
       }
     };
 
